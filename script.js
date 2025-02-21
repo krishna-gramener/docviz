@@ -5,6 +5,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4
 // State
 let uploadedFiles = [];
 let conversation = [];
+let context = "";
 const loadingModal = new bootstrap.Modal(document.getElementById("loadingModal"));
 const marked = new Marked();
 // DOM Elements
@@ -17,6 +18,7 @@ const sendMessage = document.getElementById("sendMessage");
 const clearChat = document.getElementById("clearChat");
 const exportChat = document.getElementById("exportChat");
 const loadingMessage = document.getElementById("loadingMessage");
+const clearFiles = document.getElementById("clearFiles");
 
 // Event Listeners
 dropZone.addEventListener("click", () => fileInput.click());
@@ -34,6 +36,14 @@ clearChat.addEventListener("click", clearConversation);
 exportChat.addEventListener("click", exportConversation);
 userInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") handleSendMessage();
+});
+
+clearFiles.addEventListener("click", () => {
+  uploadedFiles = [];
+  updateFileList();
+  conversation = [];
+  updateChat();
+  if (!exportChat.classList.contains("d-none")) exportChat.classList.add("d-none");
 });
 
 // File Handling
@@ -59,7 +69,9 @@ async function processFiles(files) {
         type: file.type,
         content: await extractFileContent(file),
       };
+      console.log("FileData: ", fileData);
       uploadedFiles.push(fileData);
+      console.log("Uploaded Files: ", uploadedFiles);
     }
 
     updateFileList();
@@ -69,6 +81,19 @@ async function processFiles(files) {
   } finally {
     loadingModal.hide();
   }
+}
+
+function convertImageToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result); // This will be the Base64 string
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsDataURL(file); // Reads the file as a Data URL (Base64)
+  });
 }
 
 async function extractFileContent(file) {
@@ -82,12 +107,10 @@ async function extractFileContent(file) {
       text += content.items.map((item) => item.str).join(" ");
     }
     return text;
-  } else if (file.type.includes("image")) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.readAsDataURL(file);
-    });
+  } else if (file.type.includes("image/jpeg") || file.type.includes("image/png") || file.type.includes("image/webp")) {
+    const base64Image = await convertImageToBase64(file);
+    const extractedText = await sendImageToLLM(base64Image, file.type);
+    return extractedText;
   } else if (file.type.includes("csv") || file.type.includes("excel")) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -96,6 +119,80 @@ async function extractFileContent(file) {
     });
   }
   throw new Error("Unsupported file type");
+}
+
+async function sendImageToLLM(base64Image, fileType) {
+  try {
+    const response = await fetch(
+      "https://llmfoundry.straive.com/gemini/v1beta/models/gemini-1.5-flash-8b:streamGenerateContent?alt=sse",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [
+              {
+                text: "You are a helpful assistant. Make sure to return data in JSON format only.",
+              },
+            ],
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: fileType,
+                    data: base64Image.split(",")[1],
+                  },
+                },
+                {
+                  text: "extract necessary details from this ",
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0,
+          },
+        }),
+      }
+    );
+
+    const reader = response.body.getReader();
+    let resultText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Convert the Uint8Array to a string
+      const chunk = new TextDecoder("utf-8").decode(value);
+      // Split the chunk into lines and process each line
+      chunk.split("\n").forEach((line) => {
+        if (line.startsWith("data: ")) {
+          const jsonString = line.slice(6); // Remove "data: " prefix
+          try {
+            const jsonResponse = JSON.parse(jsonString);
+            // Process the jsonResponse as needed
+            resultText += jsonResponse.candidates
+              .map((candidate) => candidate.content.parts.map((part) => part.text).join(""))
+              .join("\n");
+          } catch (e) {
+            console.error("Error parsing JSON:", e);
+          }
+        }
+      });
+    }
+    // console.log("Result Text: ",resultText);
+    return resultText; // Return the accumulated text from the response
+  } catch (error) {
+    console.error("Error sending image to LLM: ", error);
+    throw error;
+  }
 }
 
 function updateFileList() {
@@ -110,20 +207,27 @@ function updateFileList() {
     .join("");
 }
 
+function updateContext() {
+  const data = uploadedFiles
+    .map((file) => {
+      return `File: ${file.name}\nContent: ${file.content}\n\n`;
+    })
+    .join("");
+  return data;
+}
+
 // Conversation Handling
 async function initializeConversation() {
+
+  context = updateContext();
+  console.log("Context: ", context);
   if (uploadedFiles.length === 0) return;
 
+  exportChat.classList.remove("d-none");
   loadingModal.show();
   loadingMessage.textContent = "Analyzing files...";
 
   try {
-    const context = uploadedFiles
-      .map((file) => {
-        return `File: ${file.name}\nContent: ${file.content}\n\n`;
-      })
-      .join("");
-
     const response = await fetch("https://llmfoundry.straive.com/gemini/v1beta/openai/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -162,23 +266,19 @@ async function handleSendMessage() {
 
   loadingModal.show();
   loadingMessage.textContent = "Getting response...";
-
   try {
-    const response = await fetch("https://llmfoundry.straive.com/openai/v1/chat/completions", {
+    const response = await fetch("https://llmfoundry.straive.com/gemini/v1beta/openai/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gemini-1.5-flash-8b",
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant. Reference the provided context to answer questions.",
+            content: `You are a helpful assistant. Refer the provided context and conversation to answer user question.
+            This is the context: ${context} and this is the conversation: ${conversation}`,
           },
-          ...conversation.map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
           { role: "user", content: message },
         ],
       }),
@@ -197,7 +297,7 @@ async function handleSendMessage() {
 }
 
 function addMessage(role, content) {
-  conversation.push({ role, content});
+  conversation.push({ role, content });
   updateChat();
 }
 
@@ -220,12 +320,11 @@ function updateChat() {
 function clearConversation() {
   conversation = [];
   updateChat();
+  if (!exportChat.classList.contains("d-none")) exportChat.classList.add("d-none");
 }
 
 function exportConversation() {
-  const text = conversation
-    .map((msg) => `${msg.role}: ${msg.content}`)
-    .join("\n\n");
+  const text = conversation.map((msg) => `${msg.role}: ${msg.content}`).join("\n\n");
 
   const blob = new Blob([text], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
