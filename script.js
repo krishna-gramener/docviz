@@ -69,9 +69,9 @@ async function processFiles(files) {
         type: file.type,
         content: await extractFileContent(file),
       };
-      console.log("FileData: ", fileData);
+    //   console.log("FileData: ", fileData);
       uploadedFiles.push(fileData);
-      console.log("Uploaded Files: ", uploadedFiles);
+    //   console.log("Uploaded Files: ", uploadedFiles);
     }
 
     updateFileList();
@@ -220,7 +220,7 @@ function updateContext() {
 async function initializeConversation() {
 
   context = updateContext();
-  console.log("Context: ", context);
+//   console.log("Context: ", context);
   if (uploadedFiles.length === 0) return;
 
   exportChat.classList.remove("d-none");
@@ -277,7 +277,8 @@ async function handleSendMessage() {
           {
             role: "system",
             content: `You are a helpful assistant. Refer the provided context and conversation to answer user question.
-            This is the context: ${context} and this is the conversation: ${conversation}`,
+            This is the CONTEXT of all the files: ${context} and 
+            this is the CONVERSATION so far: ${conversation}`,
           },
           { role: "user", content: message },
         ],
