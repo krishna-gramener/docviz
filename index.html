@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Conversation Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+        crossorigin="anonymous" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet"
+        crossorigin="anonymous" />
+    <style>
+        .chat-container {
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin: 10px;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        .user-message {
+            background-color: #2c3338;
+            margin-left: 20%;
+        }
+
+        .assistant-message {
+            background-color: #373d44;
+            margin-right: 20%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <header class="py-3 mb-3 border-bottom ">
+            <h1 class="h3 text-center" > LLM Conversation Assistant</h1>
+        </header>
+
+        <div class="row">
+            <!-- File Upload Section -->
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header"><i class="bi bi-upload"></i> Upload Files</div>
+                    <div class="card-body">
+                        <div class="upload-area border rounded p-3 text-center" id="dropZone">
+                            <i class="bi bi-cloud-upload display-4"></i>
+                            <p>Drag files here or click to upload</p>
+                            <input type="file" id="fileInput" multiple="" class="d-none" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-files"></i> Uploaded Files</div>
+                    <div class="card-body file-list" id="fileList">
+                        <!-- Files will be listed here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conversation Section -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-chat-dots"></i> Conversation</span>
+                        <button class="btn btn-sm btn-outline-danger" id="clearChat">
+                            <i class="bi bi-trash"></i> Clear
+                        </button>
+                    </div>
+                    <div class="card-body chat-container" id="chatContainer">
+                        <!-- Messages will appear here -->
+                    </div>
+                    <div class="card-footer">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="userInput" placeholder="Type your message..." />
+                            <button class="btn btn-primary" id="sendMessage">
+                                <i class="bi bi-send"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 text-end">
+                    <button class="btn btn-success" id="exportChat">
+                        <i class="bi bi-download"></i> Export Conversation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2" id="loadingMessage">Processing...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+        crossorigin="anonymous"></script>
+    <script src="script.js" type="module">
+    </script>
+</body>
+
+</html>
