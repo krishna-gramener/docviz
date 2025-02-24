@@ -70,9 +70,9 @@ async function processFiles(files) {
         type: file.type,
         content: await extractFileContent(file),
       };
-    //   console.log("FileData: ", fileData);
+      //   console.log("FileData: ", fileData);
       uploadedFiles.push(fileData);
-    //   console.log("Uploaded Files: ", uploadedFiles);
+      //   console.log("Uploaded Files: ", uploadedFiles);
     }
 
     updateFileList();
@@ -99,8 +99,8 @@ function convertImageToBase64(file) {
 
 async function extractFileContent(file) {
   try {
-    const fileType = file.type || '';
-    if (fileType.includes('pdf')) {
+    const fileType = file.type || "";
+    if (fileType.includes("pdf")) {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjs.getDocument(arrayBuffer).promise;
       let text = "";
@@ -114,28 +114,41 @@ async function extractFileContent(file) {
       const base64Image = await convertImageToBase64(file);
       const extractedText = await sendImageToLLM(base64Image, file.type);
       return extractedText;
-    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+    } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      let text = '';
-      workbook.SheetNames.forEach(sheetName => {
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      let text = "";
+      workbook.SheetNames.forEach((sheetName) => {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        text += jsonData.map(row => row.join('\t')).join('\n') + '\n';
+        text += jsonData.map((row) => row.join("\t")).join("\n") + "\n";
       });
       return text;
     } else if (fileType.includes("csv")) {
       const text = await file.text();
-      const workbook = XLSX.read(text, { type: 'string' });
+      const workbook = XLSX.read(text, { type: "string" });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      return jsonData.map(row => row.join('\t')).join('\n');
+      const extractedText = jsonData.map((row) => row.join("\t")).join("\n");
+      console.log("CSV Extracted Text: ", extractedText);
+      return extractedText;
+    } else if (file.name.endsWith(".docx")) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await window.mammoth.extractRawText({ arrayBuffer });
+        const text = result.value || "";
+        return text;
+      } catch (error) {
+        console.error("Error extracting DOCX content:", error);
+        throw new Error("Failed to extract text from DOCX file");
+      }
     } else {
-      return await file.text();
+      const text = await file.text();
+      return text;
     }
   } catch (error) {
-    console.error('Error extracting file content:', error);
-    throw new Error('Failed to extract file content');
+    console.error("Error extracting file content:", error);
+    throw new Error("Failed to extract file content");
   }
 }
 
@@ -236,9 +249,8 @@ function updateContext() {
 
 // Conversation Handling
 async function initializeConversation() {
-
   context = updateContext();
-//   console.log("Context: ", context);
+  //   console.log("Context: ", context);
   if (uploadedFiles.length === 0) return;
 
   exportChat.classList.remove("d-none");
@@ -281,7 +293,8 @@ async function handleSendMessage() {
 
   addMessage("user", message);
   userInput.value = "";
-
+  // console.log("Conversation: ", conversation);
+  // console.log("Context: ", context);
   loadingModal.show();
   loadingMessage.textContent = "Getting response...";
   try {
