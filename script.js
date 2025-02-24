@@ -1,5 +1,6 @@
 import * as pdfjs from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4/+esm";
 import { Marked } from "https://cdn.jsdelivr.net/npm/marked@13/+esm";
+import * as XLSX from "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
 pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.worker.min.mjs";
 
 // State
@@ -97,28 +98,45 @@ function convertImageToBase64(file) {
 }
 
 async function extractFileContent(file) {
-  if (file.type.includes("pdf")) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-    let text = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      text += content.items.map((item) => item.str).join(" ");
+  try {
+    const fileType = file.type || '';
+    if (fileType.includes('pdf')) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument(arrayBuffer).promise;
+      let text = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item) => item.str).join(" ");
+      }
+      return text;
+    } else if (fileType.includes("image/jpeg") || fileType.includes("image/png") || fileType.includes("image/webp")) {
+      const base64Image = await convertImageToBase64(file);
+      const extractedText = await sendImageToLLM(base64Image, file.type);
+      return extractedText;
+    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      let text = '';
+      workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        text += jsonData.map(row => row.join('\t')).join('\n') + '\n';
+      });
+      return text;
+    } else if (fileType.includes("csv")) {
+      const text = await file.text();
+      const workbook = XLSX.read(text, { type: 'string' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      return jsonData.map(row => row.join('\t')).join('\n');
+    } else {
+      return await file.text();
     }
-    return text;
-  } else if (file.type.includes("image/jpeg") || file.type.includes("image/png") || file.type.includes("image/webp")) {
-    const base64Image = await convertImageToBase64(file);
-    const extractedText = await sendImageToLLM(base64Image, file.type);
-    return extractedText;
-  } else if (file.type.includes("csv") || file.type.includes("excel")) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.readAsText(file);
-    });
+  } catch (error) {
+    console.error('Error extracting file content:', error);
+    throw new Error('Failed to extract file content');
   }
-  throw new Error("Unsupported file type");
 }
 
 async function sendImageToLLM(base64Image, fileType) {
@@ -150,7 +168,7 @@ async function sendImageToLLM(base64Image, fileType) {
                   },
                 },
                 {
-                  text: "extract necessary details from this ",
+                  text: "extract necessary details from this. If its a graph draw some insights from it",
                 },
               ],
             },
@@ -276,7 +294,9 @@ async function handleSendMessage() {
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant. Refer the provided context and conversation to answer user question.
+            content: `You are a helpful assistant. You will converse with the user. Act like a human.
+            The user will ask you questions based on the context provided.
+            Refer the provided context and conversation to answer user question.
             This is the CONTEXT of all the files: ${context} and 
             this is the CONVERSATION so far: ${conversation}`,
           },
