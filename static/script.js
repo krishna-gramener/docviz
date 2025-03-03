@@ -70,9 +70,7 @@ async function processFiles(files) {
         type: file.type,
         content: await extractFileContent(file),
       };
-      //   console.log("FileData: ", fileData);
       uploadedFiles.push(fileData);
-      //   console.log("Uploaded Files: ", uploadedFiles);
     }
 
     updateFileList();
@@ -130,7 +128,6 @@ async function extractFileContent(file) {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       const extractedText = jsonData.map((row) => row.join("\t")).join("\n");
-      console.log("CSV Extracted Text: ", extractedText);
       return extractedText;
     } else if (file.name.endsWith(".docx")) {
       try {
@@ -218,7 +215,6 @@ async function sendImageToLLM(base64Image, fileType) {
         }
       });
     }
-    // console.log("Result Text: ",resultText);
     return resultText; // Return the accumulated text from the response
   } catch (error) {
     console.error("Error sending image to LLM: ", error);
@@ -250,7 +246,6 @@ function updateContext() {
 // Conversation Handling
 async function initializeConversation() {
   context = updateContext();
-  //   console.log("Context: ", context);
   if (uploadedFiles.length === 0) return;
 
   exportChat.classList.remove("d-none");
@@ -293,8 +288,6 @@ async function handleSendMessage() {
 
   addMessage("user", message);
   userInput.value = "";
-  // console.log("Conversation: ", conversation);
-  // console.log("Context: ", context);
   loadingModal.show();
   loadingMessage.textContent = "Getting response...";
   try {
