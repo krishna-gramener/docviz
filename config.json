@@ -1,0 +1,46 @@
+{
+  "slideTemplates": {
+    "title": {
+      "name": "title-slide",
+      "path": "/templates/html/title-slide.html",
+      "description": "Title slide with gradient background",
+      "placeholders": ["title", "subtitle", "date"]
+    },
+    "content": {
+      "name": "content-slide",
+      "path": "/templates/html/content-slide.html",
+      "description": "Content slide with bullet points",
+      "placeholders": ["title", "content", "slide-number"]
+    },
+    "image-text": {
+      "name": "image-text-slide",
+      "path": "/templates/html/image-text-slide.html",
+      "description": "Slide with image on left and text on right",
+      "placeholders": ["title", "content"]
+    },
+    "comparison": {
+      "name": "comparison-slide",
+      "path": "/templates/html/comparison-slide.html",
+      "description": "Comparison slide with two columns",
+      "placeholders": ["title", "left-title", "right-title", "left-content", "right-content"]
+    },
+    "quote": {
+      "name": "quote-slide",
+      "path": "/templates/html/quote-slide.html",
+      "description": "Quote slide with decorative elements",
+      "placeholders": ["quote", "source"]
+    },
+    "conclusion": {
+      "name": "conclusion-slide",
+      "path": "/templates/html/conclusion-slide.html",
+      "description": "Conclusion slide with takeaways",
+      "placeholders": ["title", "takeaways", "call-to-action"]
+    }
+  },
+  "presentationDefaults": {
+    "title": "Document Analysis",
+    "subtitle": "Insights and Key Information",
+    "layout": "LAYOUT_16x9",
+    "fileName": "DocViz_Presentation.pptx"
+  }
+}
