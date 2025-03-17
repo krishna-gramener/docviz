@@ -8,8 +8,6 @@ import { default as html2canvas } from "https://cdn.jsdelivr.net/npm/html2canvas
 // State
 let uploadedFiles = [];
 let conversation = [];
-let context = "";
-let isProcessing = false;
 
 // DOM Elements
 const fileInput = document.getElementById("fileInput");
@@ -29,31 +27,94 @@ const loadingModal = new bootstrap.Modal(document.getElementById("loadingModal")
 const marked = new Marked();
 
 // Event Listeners
-dropZone.addEventListener("click", () => fileInput.click());
-dropZone.addEventListener("dragover", (e) => e.preventDefault());
-dropZone.addEventListener("drop", handleFileDrop);
-fileInput.addEventListener("change", handleFileSelect);
-sendMessage.addEventListener("click", handleSendMessage);
-clearChat.addEventListener("click", clearConversation);
-exportChat.addEventListener("click", exportConversation);
-downloadPPT.addEventListener("click", generatePPTFromTemplates);
-userInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") handleSendMessage();
-});
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize libraries
+  pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4/build/pdf.worker.min.mjs";
 
-clearFiles.addEventListener("click", () => {
-  uploadedFiles = [];
-  updateFileList();
-  conversation = [];
-  updateChat();
-  if (!exportChat.classList.contains("d-none")) exportChat.classList.add("d-none");
-  if (!downloadPPT.classList.contains("d-none")) downloadPPT.classList.add("d-none");
+  // Load configuration
+  loadConfig();
+
+  // File handling events
+  if (dropZone) {
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("border-primary");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("border-primary");
+    });
+
+    dropZone.addEventListener("drop", handleFileDrop);
+
+    dropZone.addEventListener("click", () => {
+      if (fileInput) {
+        fileInput.click();
+      }
+    });
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener("change", handleFileSelect);
+  }
+
+  if (clearFiles) {
+    clearFiles.addEventListener("click", () => {
+      uploadedFiles = [];
+      updateFileList();
+      clearConversation();
+    });
+  }
+
+  // Conversation events
+  if (userInput) {
+    userInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        handleSendMessage();
+      }
+    });
+  }
+
+  if (sendMessage) {
+    sendMessage.addEventListener("click", handleSendMessage);
+  }
+
+  if (clearChat) {
+    clearChat.addEventListener("click", clearConversation);
+  }
+
+  if (exportChat) {
+    exportChat.addEventListener("click", exportConversation);
+  }
+
+  // PPT generation event
+  if (downloadPPT) {
+    downloadPPT.addEventListener("click", async () => {
+      try {
+        loadingModal.show();
+        loadingMessage.textContent = "Generating presentation...";
+
+        // Get presentation content from LLM
+        const presentationData = await getPresentationContentFromLLM();
+
+        // Generate and download the presentation
+        await generatePresentation(presentationData, {});
+      } catch (error) {
+        showError("Error generating presentation: " + error.message);
+        console.error(error);
+      } finally {
+        loadingModal.hide();
+      }
+    });
+  }
 });
 
 // File Handling
 async function handleFileDrop(e) {
   e.preventDefault();
-  dropZone.classList.remove("bg-secondary");
+  if (dropZone) {
+    dropZone.classList.remove("bg-secondary");
+  }
   const files = e.dataTransfer.files;
   await processFiles(files);
 }
@@ -271,15 +332,17 @@ async function sendImageToLLM(base64Image, fileType) {
 }
 
 function updateFileList() {
-  fileList.innerHTML = uploadedFiles
-    .map(
-      (file) => `
-        <div class="alert alert-secondary">
-            <i class="bi bi-file-earmark"></i> ${file.name}
-        </div>
-    `
-    )
-    .join("");
+  if (fileList) {
+    fileList.innerHTML = uploadedFiles
+      .map(
+        (file) => `
+          <div class="alert alert-secondary">
+              <i class="bi bi-file-earmark"></i> ${file.name}
+          </div>
+      `
+      )
+      .join("");
+  }
 }
 
 function updateContext() {
@@ -295,8 +358,8 @@ function updateContext() {
 async function initializeConversation() {
   if (uploadedFiles.length === 0) return;
 
-  exportChat.classList.remove("d-none");
-  downloadPPT.classList.remove("d-none");
+  exportChat?.classList.remove("d-none");
+  downloadPPT?.classList.remove("d-none");
   loadingModal.show();
   loadingMessage.textContent = "Analyzing files...";
 
@@ -331,7 +394,7 @@ async function initializeConversation() {
 }
 
 async function handleSendMessage() {
-  const message = userInput.value.trim();
+  const message = userInput?.value.trim();
   if (!message) return;
 
   addMessage("user", message);
@@ -377,26 +440,32 @@ function addMessage(role, content) {
 }
 
 function updateChat() {
-  chatContainer.innerHTML = conversation
-    .map(
-      (msg) => `
-        <div class="message ${msg.role}-message">
-            <div class="message-header">
-                <strong>${msg.role === "user" ? "You" : "Assistant"}</strong>
-            </div>
-            <div class="message-content">${marked.parse(msg.content)}</div>
-        </div>
-    `
-    )
-    .join("");
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  if (chatContainer) {
+    chatContainer.innerHTML = conversation
+      .map(
+        (msg) => `
+          <div class="message ${msg.role}-message">
+              <div class="message-header">
+                  <strong>${msg.role === "user" ? "You" : "Assistant"}</strong>
+              </div>
+              <div class="message-content">${marked.parse(msg.content)}</div>
+          </div>
+      `
+      )
+      .join("");
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
 }
 
 function clearConversation() {
   conversation = [];
   updateChat();
-  if (!exportChat.classList.contains("d-none")) exportChat.classList.add("d-none");
-  if (!downloadPPT.classList.contains("d-none")) downloadPPT.classList.add("d-none");
+  if (exportChat && !exportChat.classList.contains("d-none")) {
+    exportChat.classList.add("d-none");
+  }
+  if (downloadPPT && !downloadPPT.classList.contains("d-none")) {
+    downloadPPT.classList.add("d-none");
+  }
 }
 
 function exportConversation() {
@@ -423,47 +492,338 @@ function showError(message) {
 }
 
 // PPT Generation Functions
-async function generatePPTFromTemplates() {
-  if (uploadedFiles.length === 0) {
-    showError("Please upload files before generating a presentation");
-    return;
-  }
-
-  loadingModal.show();
-  loadingMessage.textContent = "Generating presentation content...";
-
+async function generatePresentation(presentationData, config) {
   try {
-    // Load configuration
-    const config = await loadConfig();
+    // Initialize pptxgenjs
+    const pptx = new pptxgenjs();
+
+    // Set default config if not provided
+    const defaultConfig = {
+      presentationDefaults: {
+        layout: "LAYOUT_16x9",
+        title: "Generated Presentation",
+      },
+      slideTemplates: {
+        title: {
+          path: "/templates/html/title-slide.html",
+          background: "#ffffff",
+        },
+        content: {
+          path: "/templates/html/content-slide.html",
+          background: "#ffffff",
+        },
+        conclusion: {
+          path: "/templates/html/conclusion-slide.html",
+          background: "#ffffff",
+        },
+      },
+    };
+    // Merge provided config with defaults
+    config = { ...defaultConfig, ...config };
+
+    // Ensure slideTemplates is properly merged (deep merge for nested objects)
+    if (!config.slideTemplates) {
+      config.slideTemplates = defaultConfig.slideTemplates;
+    }
+
+    // We'll set the presentation properties after loading the first template
+    // to ensure dimensions match the template
+
+    // Create a temporary container for processing slides
+    const tempContainer = document.createElement("div");
+    tempContainer.style.position = "absolute";
+    tempContainer.style.left = "-9999px";
+    tempContainer.style.top = "-9999px";
+    document.body.appendChild(tempContainer);
+
+    // Load the first template to get dimensions
+    let templateDimensions = null;
+    let firstTemplateConfig = null;
     
-    // Get presentation content from LLM
-    const presentationData = await getPresentationContentFromLLM();
+    // Find the first valid template to use for dimensions
+    for (const slideType in config.slideTemplates) {
+      firstTemplateConfig = config.slideTemplates[slideType];
+      if (firstTemplateConfig && firstTemplateConfig.path) {
+        break;
+      }
+    }
     
-    // Create and download the presentation
-    await createAndDownloadPresentation(presentationData, config);
-    
+    if (firstTemplateConfig) {
+      try {
+        const templatePath = firstTemplateConfig.path.startsWith("/")
+          ? window.location.origin + firstTemplateConfig.path
+          : window.location.origin + "/" + firstTemplateConfig.path;
+          
+        const response = await fetch(templatePath);
+        if (response.ok) {
+          const templateHTML = await response.text();
+          tempContainer.innerHTML = templateHTML;
+          
+          // Wait a moment for styles to apply
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          
+          const rootElement = tempContainer.firstChild;
+          if (rootElement) {
+            const rect = rootElement.getBoundingClientRect();
+            templateDimensions = {
+              width: rect.width,
+              height: rect.height
+            };
+            
+            // Set custom slide size based on template dimensions
+            pptx.defineLayout({
+              name: 'CUSTOM_LAYOUT',
+              width: templateDimensions.width / 96,  // Convert pixels to inches (96 DPI)
+              height: templateDimensions.height / 96
+            });
+            pptx.layout = 'CUSTOM_LAYOUT';
+            
+            // Set other presentation properties
+            pptx.title = presentationData.slides[0]?.title || config.presentationDefaults.title;
+            pptx.author = 'Gramener';
+          }
+        }
+      } catch (error) {
+        console.error("Error loading first template for dimensions:", error);
+        // Fall back to default layout
+        pptx.layout = config.presentationDefaults.layout;
+      }
+    }
+
+    // Process each slide
+    for (let i = 0; i < presentationData.slides.length; i++) {
+      const slideData = presentationData.slides[i];
+      const slideType = slideData.type || "content"; // Default to content if no type specified
+
+      // Add slide number for content slides
+      if (slideType === "content") {
+        slideData["slide-number"] = i + 1;
+      }
+
+      // Add current date for title slides if not provided
+      if (slideType === "title") {
+        const now = new Date();
+        const day = now.getDate();
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+        const month = monthNames[now.getMonth()];
+        const year = now.getFullYear();
+        slideData.date = `${day} ${month} ${year}`;
+      }
+
+      // Get the template configuration for this slide type
+      let templateConfig = config.slideTemplates[slideType];
+      if (!templateConfig) {
+        console.warn(`Template not found for slide type: ${slideType}. Using content template as fallback.`);
+        // Use content template as fallback
+        const fallbackType = "content";
+        templateConfig = config.slideTemplates[fallbackType];
+
+        if (!templateConfig) {
+          console.error(`Fallback template not found either. Skipping slide ${i + 1}.`);
+          continue;
+        }
+      }
+
+      try {
+        // 1. Load the template HTML
+        const templatePath = templateConfig.path.startsWith("/")
+          ? window.location.origin + templateConfig.path
+          : window.location.origin + "/" + templateConfig.path;
+
+        try {
+          const response = await fetch(templatePath);
+          if (!response.ok) {
+            console.error(`Failed to load template: ${templateConfig.path} (Status: ${response.status})`);
+            continue;
+          }
+
+          // Get the template HTML
+          const templateHTML = await response.text();
+          // 2. Create a temporary DOM element with the template
+          tempContainer.innerHTML = templateHTML;
+
+          // Wait a moment for styles to apply
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        } catch (error) {
+          console.error(`Error fetching template: ${error.message}`);
+          continue;
+        }
+
+        // Get the root element of the template
+        const rootElement = tempContainer.firstChild;
+
+        // Check if root element exists
+        if (!rootElement) {
+          console.error(`No root element found in template for slide ${i + 1}. Template may be empty or invalid.`);
+          continue;
+        }
+
+        const rootRect = rootElement.getBoundingClientRect();
+
+        // Create a new PowerPoint slide
+        const slide = pptx.addSlide();
+
+        // Set slide background based on slide type
+        if (slideType === "conclusion") {
+          slide.background = { color: "2C3E50" };
+        } else if (slideType === "title") {
+          slide.background = { color: "1F2937" };
+        } else {
+          slide.background = { color: "FFFFFF" };
+        }
+
+        // 3. Find all placeholders in the template
+        const placeholders = rootElement.querySelectorAll("[data-name]");
+        // 4. Process each placeholder
+        placeholders.forEach((placeholder) => {
+          const placeholderName = placeholder.getAttribute("data-name");
+          const placeholderValue = slideData[placeholderName] || "";
+          
+          // Skip if no value provided for this placeholder
+          if (placeholderValue === undefined || placeholderValue === null) {
+            return;
+          }
+
+          // Get placeholder position relative to the slide
+          const rect = placeholder.getBoundingClientRect();
+          const dpi = 96; // PowerPoint uses 96 dpi
+          
+          // Calculate position as a percentage of the template dimensions
+          // This ensures elements are positioned correctly regardless of slide size
+          const position = {
+            x: (rect.left - rootRect.left) / rootRect.width * 100 / 100 * (templateDimensions.width / dpi),
+            y: (rect.top - rootRect.top) / rootRect.height * 100 / 100 * (templateDimensions.height / dpi),
+            w: rect.width / rootRect.width * 100 / 100 * (templateDimensions.width / dpi),
+            h: rect.height / rootRect.height * 100 / 100 * (templateDimensions.height / dpi)
+          };
+
+          // Handle different types of placeholders
+          if (placeholder.tagName.toLowerCase() === "img") {
+            // Handle image placeholder
+            if (typeof placeholderValue === "string" && placeholderValue.startsWith("http")) {
+              // Calculate the displayed dimensions based on object-fit: contain
+              const imgPosition = { ...position };
+
+              // If the style has an object-fit: contain, use the natural dimensions of the image
+              if (placeholder.style.objectFit === "contain") {
+                // Get the natural dimensions of the image
+                const naturalWidth = placeholder.naturalWidth;
+                const naturalHeight = placeholder.naturalHeight;
+
+                // Calculate the aspect ratio of the image
+                const imageRatio = naturalWidth / naturalHeight;
+                const containerRatio = rect.width / rect.height;
+
+                // Adjust dimensions based on object-fit: contain logic
+                if (imageRatio > containerRatio) {
+                  // Image is wider than container (relative to height)
+                  const displayedHeight = rect.width / imageRatio;
+                  imgPosition.y += (rect.height - displayedHeight) / 2 / dpi;
+                  imgPosition.h = displayedHeight / dpi;
+                } else {
+                  // Image is taller than container (relative to width)
+                  const displayedWidth = rect.height * imageRatio;
+                  imgPosition.x += (rect.width - displayedWidth) / 2 / dpi;
+                  imgPosition.w = displayedWidth / dpi;
+                }
+              }
+
+              slide.addImage({
+                ...imgPosition,
+                path: placeholderValue,
+              });
+            }
+          } else {
+            // Get computed style for the placeholder
+            const computed = window.getComputedStyle(placeholder);
+            const bgColor = rgbToHex(computed.backgroundColor);
+
+            // Extract transparency from rgba background if present
+            let transparency = 0;
+            const bgMatch = computed.backgroundColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
+            if (bgMatch && bgMatch[4] !== undefined) transparency = Math.round((1 - parseFloat(bgMatch[4])) * 100);
+
+            // Handle text placeholders
+            const textOptions = {
+              ...position,
+              fontSize: (parseFloat(computed.fontSize) / dpi) * 96,
+              color: rgbToHex(computed.color),
+              fill: { color: bgColor, transparency },
+              bold: computed.fontWeight === "bold" || parseInt(computed.fontWeight) >= 700,
+              italic: computed.fontStyle === "italic",
+              underline: computed.textDecorationLine.includes("underline"),
+              align: computed.textAlign || "left",
+            };
+
+            if (Array.isArray(placeholderValue)) {
+              // Handle array values as bullet points
+              slide.addText(placeholderValue.map((item) => `• ${String(item)}`).join("\n"), {
+                ...textOptions,
+                bullet: { type: "bullet" },
+              });
+            } else {
+              // Handle regular text
+              const textValue = String(placeholderValue);
+              slide.addText(textValue, textOptions);
+            }
+          }
+        });
+
+        // Clear the temporary container
+        tempContainer.innerHTML = "";
+      } catch (error) {
+        console.error(`Error processing slide ${i + 1}:`, error);
+        // Add a slide with error message
+        const slide = pptx.addSlide();
+        slide.addText(`Error processing slide ${i + 1}: ${error.message}`, {
+          x: 1,
+          y: 1,
+          w: 8,
+          h: 4,
+          fontSize: 14,
+          color: "FF0000",
+        });
+      }
+    }
+
+    // Remove the temporary container
+    document.body.removeChild(tempContainer);
+
+    // Save the presentation
+    pptx.writeFile({ fileName: "DocViz_Presentation.pptx" });
   } catch (error) {
     console.error("Error generating presentation:", error);
-    showError("Error generating presentation: " + error.message);
-  } finally {
-    loadingModal.hide();
+    throw error;
   }
+}
+
+// Helper function to convert RGB color to hex
+function rgbToHex(rgb) {
+  const result = rgb.match(/\d+/g);
+  if (!result) return "000000";
+  return result
+    .slice(0, 3)
+    .map((x) => {
+      let hex = parseInt(x).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    })
+    .join("");
 }
 
 async function loadConfig() {
   try {
-    const response = await fetch('/config.json');
-    if (!response.ok) throw new Error('Failed to load configuration');
+    const response = await fetch("/config.json");
+    if (!response.ok) throw new Error("Failed to load configuration");
     return await response.json();
   } catch (error) {
-    console.error('Error loading config:', error);
+    console.error("Error loading config:", error);
     throw error;
   }
 }
 
 async function getPresentationContentFromLLM() {
   try {
-    const response = await fetch('https://llmfoundry.straive.com/gemini/v1beta/openai/chat/completions', {
+    const response = await fetch("https://llmfoundry.straive.com/gemini/v1beta/openai/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -474,69 +834,51 @@ async function getPresentationContentFromLLM() {
             role: "system",
             content: `You are a presentation expert. Create a professional presentation based on the provided documents.
 
-IMPORTANT: You MUST create EXACTLY 5 slides in EXACTLY this order:
-1. First slide: type "content" - a general overview or introduction
-2. Second slide: type "image-text" - a slide with text content
-3. Third slide: type "comparison" - a slide comparing two aspects
-4. Fourth slide: type "quote" - a slide with a notable quote
-5. Fifth slide: type "conclusion" - a summary slide with takeaways
+IMPORTANT: You MUST create a presentation with AT MOST 5 slides following these rules:
+1. First slide: type "title" - must be the first slide and appear exactly once
+2. Middle slides: type "content" - can appear multiple times (1-3 slides)
+3. Last slide: type "conclusion" - must be the last slide and appear exactly once
 
 Return a JSON object with the following structure:
 {
-  "title": "Main presentation title",
-  "subtitle": "Presentation subtitle",
   "slides": [
     {
+      "type": "title",
+      "title": "Main presentation title [4-5 words]",
+      "subtitle": "Presentation subtitle [4-5 words]"
+    },
+    {
       "type": "content",
-      "title": "Introduction",
-      "content": ["Bullet point 1", "Bullet point 2", "Bullet point 3"]
-    },
-    {
-      "type": "image-text",
-      "title": "Visual Analysis",
-      "content": ["Text point 1", "Text point 2", "Text point 3"]
-    },
-    {
-      "type": "comparison",
-      "title": "Comparative Analysis",
-      "leftTitle": "First Aspect",
-      "rightTitle": "Second Aspect",
-      "leftContent": ["Point 1", "Point 2"],
-      "rightContent": ["Point 1", "Point 2"]
-    },
-    {
-      "type": "quote",
-      "title": "Key Insight",
-      "quote": "Important quote from the document",
-      "source": "Source of the quote"
+      "title": "Content Section Title",
+      "content": ["Bullet point 1", "Bullet point 2", "Bullet point 3", "Bullet point 4", "Bullet point 5"]
     },
     {
       "type": "conclusion",
-      "title": "Key Takeaways",
-      "content": ["Summary point 1", "Summary point 2",....],
-      "takeaways": ["Takeaway 1", "Takeaway 2", "Takeaway 3",....],
+      "title": "Conclusion",
+      "takeaways": ["Key takeaway 1", "Key takeaway 2", "Key takeaway 3", "Key takeaway 4"...],
       "call-to-action": "Next steps or action item"
     }
   ]
 }
 
 Make the presentation informative, well-structured, and highlight the most important information from the documents. 
-DO NOT deviate from this exact structure and slide types.`
+DO NOT deviate from this exact structure and slide types.
+Remember that the title slide must be first, conclusion slide must be last, and content slides can appear 1-3 times in between.
+The total number of slides must not exceed 5.`,
           },
-          { role: "user", content: updateContext() }
-        ]
-      })
+          { role: "user", content: updateContext() },
+        ],
+      }),
     });
 
     const result = await response.json();
     if (result.error) throw new Error(result.error.message);
 
     const contentString = result.choices?.[0]?.message?.content;
-    
+
     // Extract JSON from the response
-    const jsonMatch = contentString.match(/```json\n([\s\S]*?)\n```/) || 
-                      contentString.match(/```([\s\S]*?)```/) ||
-                      [null, contentString];
+    const jsonMatch = contentString.match(/```json\n([\s\S]*?)\n```/) ||
+      contentString.match(/```([\s\S]*?)```/) || [null, contentString];
     let presentationData;
     try {
       presentationData = JSON.parse(jsonMatch[1] || contentString);
@@ -548,148 +890,5 @@ DO NOT deviate from this exact structure and slide types.`
   } catch (error) {
     console.error("Error getting presentation content:", error);
     throw error;
-  }
-}
-
-async function createAndDownloadPresentation(presentationData, config) {
-  try {
-    loadingMessage.textContent = "Creating presentation...";
-    
-    // Initialize pptxgenjs
-    const pptx = new pptxgenjs();
-    
-    // Set presentation properties
-    pptx.layout = config.presentationDefaults.layout;
-    pptx.title = presentationData.title || config.presentationDefaults.title;
-    pptx.author='Gramener';
-    // Create title slide using the title and subtitle from the data
-    await createSlideFromTemplate(pptx, "title", {
-      title: presentationData.title || config.presentationDefaults.title,
-      subtitle: presentationData.subtitle || config.presentationDefaults.subtitle,
-      date: new Date().toLocaleDateString()
-    }, config);
-    
-    // Create content slides based on the data
-    for (const slide of presentationData.slides) {
-      const slideType = slide.type || "content";
-      
-      // Create slide based on template and data
-      await createSlideFromTemplate(pptx, slideType, slide, config);
-    }
-    
-    // Save the presentation
-    pptx.writeFile({ fileName: config.presentationDefaults.fileName });
-    
-  } catch (error) {
-    console.error("Error creating presentation:", error);
-    throw error;
-  }
-}
-
-async function createSlideFromTemplate(pptx, slideType, data, config) {
-  try {
-    // Get template details from config
-    const templateConfig = config.slideTemplates[slideType];
-    if (!templateConfig) {
-      console.warn(`Template configuration not found for slide type: ${slideType}, using content slide as fallback`);
-      const fallbackConfig = config.slideTemplates["content"];
-      if (!fallbackConfig) {
-        throw new Error("No fallback template available");
-      }
-      
-      // Load the fallback template HTML
-      const response = await fetch(fallbackConfig.path);
-      if (!response.ok) throw new Error(`Failed to load fallback template`);
-      let html = await response.text();
-      
-      // Process the slide with the fallback template
-      processSlideHtml(html, data, "content", pptx);
-      return;
-    }
-    
-    // Load the template HTML
-    const response = await fetch(templateConfig.path);
-    if (!response.ok) throw new Error(`Failed to load template: ${templateConfig.name}`);
-    let html = await response.text();
-    
-    // Process the slide with the appropriate template
-    processSlideHtml(html, data, slideType, pptx);
-    
-  } catch (error) {
-    console.error(`Error creating slide from template ${slideType}:`, error);
-  }
-}
-
-async function processSlideHtml(html, data, slideType, pptx) {
-  // Create a temporary container and parse the HTML
-  const tempContainer = document.createElement('div');
-  tempContainer.innerHTML = html;
-  
-  // Find all elements with data-name attributes
-  const elements = tempContainer.querySelectorAll('[data-name]');
-  
-  // Process each element
-  elements.forEach(element => {
-    const dataName = element.getAttribute('data-name');
-    
-    // Get the corresponding data value
-    const value = data[dataName];
-    
-    if (value !== undefined) {
-      if (typeof value === 'string' || typeof value === 'number') {
-        // Handle simple string/number values
-        element.innerHTML = value;
-      } else if (Array.isArray(value)) {
-        // Handle arrays (bullet points)
-        const bulletPoints = value.map(item => `• ${item}`).join('<br>');
-        element.innerHTML = bulletPoints;
-      }
-    }
-    
-    // Handle special naming conventions (leftContent -> left-content)
-    const camelCaseName = dataName.replace(/-([a-z])/g, g => g[1].toUpperCase());
-    if (data[camelCaseName] !== undefined) {
-      const value = data[camelCaseName];
-      if (Array.isArray(value)) {
-        element.innerHTML = value.map(item => `• ${item}`).join('<br>');
-      } else {
-        element.innerHTML = value;
-      }
-    }
-  });
-
-  // Add the container to the document temporarily (required for html2canvas)
-  tempContainer.style.position = 'absolute';
-  tempContainer.style.left = '-9999px';
-  document.body.appendChild(tempContainer);
-
-  try {
-    // Convert HTML to canvas
-    const canvas = await html2canvas(tempContainer, {
-      backgroundColor: null,
-      scale: 2, // Higher resolution
-      logging: false,
-      width: 1200, // PowerPoint standard width
-      height: 675  // PowerPoint standard height (16:9)
-    });
-
-    // Convert canvas to base64 image
-    const imageData = canvas.toDataURL('image/png');
-
-    // Create a new slide
-    const slide = pptx.addSlide();
-    
-    // Add the image to cover the entire slide
-    slide.addImage({
-      data: imageData,
-      x: 0,
-      y: 0,
-      w: '100%',
-      h: '100%'
-    });
-
-  } finally {
-    // Clean up: remove the temporary container
-    document.body.removeChild(tempContainer);
   }
 }
