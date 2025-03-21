@@ -756,10 +756,13 @@ async function generatePresentation(presentationData, config) {
             };
 
             if (Array.isArray(placeholderValue)) {
-              // Handle array values as bullet points
-              slide.addText(placeholderValue.map((item) => `• ${String(item)}`).join("\n"), {
+              // For arrays, use the line break approach with bullet option
+              const bulletText = placeholderValue.map(item => String(item)).join('\n');
+              
+              // Add text with bullet option set to true to create bullet points for each line
+              slide.addText(bulletText, {
                 ...textOptions,
-                bullet: { type: "bullet" },
+                bullet: true  // This will create a bullet for each line in the text
               });
             } else {
               // Handle regular text
